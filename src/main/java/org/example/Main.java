@@ -1,32 +1,36 @@
 package org.example;
 
 import java.util.*;
+import java.util.concurrent.*;
 
 public class Main {
-    public static void main(String[] args) throws InterruptedException {
+    public static void main(String[] args) throws InterruptedException, ExecutionException {
         String[] texts = new String[25];
         for (int i = 0; i < texts.length; i++) {
             texts[i] = generateText("aab", 30_000);
         }
 
-        List<Thread> threads = new ArrayList<>();
+        final ExecutorService threadPool = Executors.newFixedThreadPool(8);
+        List<Future<Integer>> futureTasks = new ArrayList<>();
 
         long startTs = System.currentTimeMillis(); // start time
         for (String text : texts) {
-            Thread thread = getThread(text);
-            threads.add(thread);
-            thread.start();
+            final Future<Integer> task = threadPool.submit(getCallable(text));
+            futureTasks.add(task);
         }
-        for (Thread thread : threads) {
-            thread.join();
+        int allTimeMax = 0;
+        for (Future<Integer> task : futureTasks) {
+            allTimeMax = Math.max(allTimeMax, task.get());
         }
+        System.out.println("Max value among all intervals: " + allTimeMax);
+        threadPool.shutdown();
         long endTs = System.currentTimeMillis(); // end time
 
         System.out.println("Time: " + (endTs - startTs) + "ms");
     }
 
-    private static Thread getThread(String text) {
-        Runnable logic = () -> {
+    private static Callable<Integer> getCallable(String text) {
+        return () -> {
             int maxSize = 0;
             for (int i = 0; i < text.length(); i++) {
                 for (int j = 0; j < text.length(); j++) {
@@ -46,9 +50,8 @@ public class Main {
                 }
             }
             System.out.println(text.substring(0, 100) + " -> " + maxSize);
+            return maxSize;
         };
-
-        return new Thread(logic);
     }
 
     public static String generateText(String letters, int length) {
